@@ -5,7 +5,7 @@ class RetryConfiguration {
   final bool infinite;
 
   const RetryConfiguration({this.tryCount, this.infinite = true})
-      : assert(tryCount == null && infinite,
+      : assert(!(tryCount == null && !infinite),
             'tryCount must be null if infinite is true');
 
   RetryConfiguration copyWith({

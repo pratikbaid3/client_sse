@@ -176,6 +176,10 @@ class SSEClient {
           streamController: streamController,
           config: retryConfig,
         );
+      } finally {
+        if (retryConfig.tryCount == 0) {
+          return Stream.error('rety exceeded');
+        }
       }
       return streamController.stream;
     }
