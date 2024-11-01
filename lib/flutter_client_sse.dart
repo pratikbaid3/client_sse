@@ -2,9 +2,12 @@ library flutter_client_sse;
 
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_client_sse/constants/sse_request_type_enum.dart';
 import 'package:http/http.dart' as http;
+
 part 'sse_event_model.dart';
+part 'sse_retry_configuration.dart';
 
 /// A client for subscribing to Server-Sent Events (SSE).
 class SSEClient {
@@ -17,22 +20,28 @@ class SSEClient {
   /// [header] is a map of request headers.
   /// [body] is an optional request body for POST requests.
   /// [streamController] is required to persist the stream from the old connection
-  static void _retryConnection(
+  static RetryConfiguration _retryConnection(
       {required SSERequestType method,
       required String url,
       required Map<String, String> header,
       required StreamController<SSEModel> streamController,
+      required RetryConfiguration config,
       Map<String, dynamic>? body}) {
     print('---RETRY CONNECTION---');
-    Future.delayed(Duration(seconds: 5), () {
-      subscribeToSSE(
-        method: method,
-        url: url,
-        header: header,
-        body: body,
-        oldStreamController: streamController,
-      );
-    });
+    if (config.infinite || (config.tryCount ?? 0) > 0) {
+      Future.delayed(Duration(seconds: 5), () {
+        subscribeToSSE(
+          method: method,
+          url: url,
+          header: header,
+          body: body,
+          oldStreamController: streamController,
+        );
+      });
+      return config.use();
+    } else {
+      return config;
+    }
   }
 
   /// Subscribe to Server-Sent Events.
@@ -43,18 +52,21 @@ class SSEClient {
   /// [body] is an optional request body for POST requests.
   ///
   /// Returns a [Stream] of [SSEModel] representing the SSE events.
-  static Stream<SSEModel> subscribeToSSE(
-      {required SSERequestType method,
-      required String url,
-      required Map<String, String> header,
-      StreamController<SSEModel>? oldStreamController,
-      Map<String, dynamic>? body}) {
+  static Stream<SSEModel> subscribeToSSE({
+    required SSERequestType method,
+    required String url,
+    required Map<String, String> header,
+    StreamController<SSEModel>? oldStreamController,
+    Map<String, dynamic>? body,
+    RetryConfiguration retryConfig = const RetryConfiguration(),
+  }) {
     StreamController<SSEModel> streamController = StreamController();
     if (oldStreamController != null) {
       streamController = oldStreamController;
     }
     var lineRegex = RegExp(r'^([^:]*)(?::)?(?: )?(.*)?$');
     var currentSSEModel = SSEModel(data: '', id: '', event: '');
+
     print("--SUBSCRIBING TO SSE---");
     while (true) {
       try {
@@ -121,46 +133,48 @@ class SSEClient {
                   default:
                     print('---ERROR---');
                     print(dataLine);
-                    _retryConnection(
+                    retryConfig = _retryConnection(
                       method: method,
                       url: url,
                       header: header,
                       streamController: streamController,
+                      config: retryConfig,
                     );
                 }
               },
               onError: (e, s) {
                 print('---ERROR---');
                 print(e);
-                _retryConnection(
+
+                retryConfig = _retryConnection(
                   method: method,
                   url: url,
                   header: header,
-                  body: body,
                   streamController: streamController,
+                  config: retryConfig,
                 );
               },
             );
         }, onError: (e, s) {
           print('---ERROR---');
           print(e);
-          _retryConnection(
+          retryConfig = _retryConnection(
             method: method,
             url: url,
             header: header,
-            body: body,
             streamController: streamController,
+            config: retryConfig,
           );
         });
       } catch (e) {
         print('---ERROR---');
         print(e);
-        _retryConnection(
+        retryConfig = _retryConnection(
           method: method,
           url: url,
           header: header,
-          body: body,
           streamController: streamController,
+          config: retryConfig,
         );
       }
       return streamController.stream;
