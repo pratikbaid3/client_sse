@@ -4,12 +4,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_client_sse/constants/sse_request_type_enum.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
+import 'sse_stream.dart' if (dart.library.js) 'sse_stream_web.dart';
+
 part 'sse_event_model.dart';
+
+
 
 /// A client for subscribing to Server-Sent Events (SSE).
 class SSEClient {
-  static http.Client _client = new http.Client();
-
   /// Retry the SSE connection after a delay.
   ///
   /// [method] is the request method (GET or POST).
@@ -58,7 +61,7 @@ class SSEClient {
     print("--SUBSCRIBING TO SSE---");
     while (true) {
       try {
-        _client = http.Client();
+        newClient();
         var request = new http.Request(
           method == SSERequestType.GET ? "GET" : "POST",
           Uri.parse(url),
@@ -74,12 +77,12 @@ class SSEClient {
           request.body = jsonEncode(body);
         }
 
-        Future<http.StreamedResponse> response = _client.send(request);
+        Future<ByteStream> response = getStream(request);
 
         /// Listening to the response as a stream
         response.asStream().listen((data) {
           /// Applying transforms and listening to it
-          data.stream
+          data
             ..transform(Utf8Decoder()).transform(LineSplitter()).listen(
               (dataLine) {
                 if (dataLine.isEmpty) {
@@ -169,6 +172,6 @@ class SSEClient {
 
   /// Unsubscribe from the SSE.
   static void unsubscribeFromSSE() {
-    _client.close();
+    close();
   }
 }
