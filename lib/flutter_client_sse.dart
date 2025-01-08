@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:flutter_client_sse/constants/sse_request_type_enum.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
-import 'sse_stream.dart' if (dart.library.js) 'sse_client_web.dart';
+import 'sse_stream.dart' if (dart.library.js) 'sse_stream_web.dart';
 
 part 'sse_event_model.dart';
 
